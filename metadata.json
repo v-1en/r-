@@ -1,0 +1,5 @@
+{
+  "name": "MyTimetable",
+  "description": "A robust timetable application featuring a visual day view with overlap handling, Excel-style drag-and-copy month view, and Gemini AI schedule analysis.",
+  "requestFramePermissions": []
+}
