@@ -35,6 +35,7 @@ export const MonthView: React.FC<MonthViewProps> = ({
   const [editingGroupCount, setEditingGroupCount] = useState(0);
 
   // Group recurring tasks
+  // NOTE: We do NOT sort these by time, preserving original grouping logic as requested.
   const recurringGroups = React.useMemo(() => {
     const groups: Record<string, ScheduleEvent[]> = {};
     events.forEach(e => {
@@ -151,7 +152,12 @@ export const MonthView: React.FC<MonthViewProps> = ({
     }
   };
 
-  const getDayEvents = (dateStr: string) => events.filter(e => e.date === dateStr);
+  // Helper to get events for a specific day, SORTED by start time
+  const getDayEvents = (dateStr: string) => {
+    return events
+      .filter(e => e.date === dateStr)
+      .sort((a, b) => a.startMinute - b.startMinute); // Sorts earliest first
+  };
 
   return (
     <div className="bg-gray-100 select-none h-full flex flex-col w-full relative">
