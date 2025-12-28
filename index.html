@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <title>MyTimetable</title>
     
-    <!-- PWA Settings -->
-    <link rel="manifest" href="/manifest.json" />
+    <!-- PWA Settings handled by vite-plugin-pwa, but we add basic iOS meta tags here -->
+    <link rel="icon" type="image/svg+xml" href="/app-icon.svg" />
     <meta name="theme-color" content="#ffffff" />
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -38,7 +38,8 @@
     "lucide-react": "https://esm.sh/lucide-react@^0.562.0",
     "@google/genai": "https://esm.sh/@google/genai@^1.34.0",
     "vite": "https://esm.sh/vite@^7.3.0",
-    "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@^5.1.2"
+    "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@^5.1.2",
+    "vite-plugin-pwa": "https://esm.sh/vite-plugin-pwa@^1.2.0"
   }
 }
 </script>
@@ -46,19 +47,5 @@
   <body class="bg-gray-50 text-gray-900 h-screen overflow-hidden">
     <div id="root" class="h-full flex flex-col"></div>
     <script type="module" src="/index.tsx"></script>
-    <script>
-      // Register Service Worker for Offline Capabilities
-      if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sw.js')
-            .then(registration => {
-              console.log('ServiceWorker registration successful with scope: ', registration.scope);
-            })
-            .catch(err => {
-              console.log('ServiceWorker registration failed: ', err);
-            });
-        });
-      }
-    </script>
   </body>
 </html>

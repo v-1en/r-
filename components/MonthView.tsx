@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { ScheduleEvent } from '../types';
 import { formatDate, getDaysInMonth, formatTime } from '../utils/dateUtils';
 import { ChevronLeft, ChevronRight, Copy, Repeat, Edit2, RotateCcw } from 'lucide-react';
@@ -43,11 +43,10 @@ export const MonthView: React.FC<MonthViewProps> = ({
             groups[e.groupId].push(e);
         }
     });
-    // Only return groups that actually have events
     return Object.values(groups).filter(g => g.length > 0);
   }, [events]);
 
-  // Prevent text selection during drag
+  // Global Mouse Up for PC
   useEffect(() => {
     const handleGlobalMouseUp = () => {
       if (isDragging) {
@@ -64,33 +63,79 @@ export const MonthView: React.FC<MonthViewProps> = ({
   const totalCells = paddingDays.length + daysInMonth.length;
   const totalRows = Math.ceil(totalCells / 7);
 
+  // --- Mouse (PC) Logic ---
   const handleDateMouseDown = (e: React.MouseEvent, dateStr: string) => {
     if (e.button !== 0) return;
+    startDrag(dateStr);
+  };
+
+  const handleDateMouseEnter = (dateStr: string) => {
+    if (isDragging && sourceDate && dateStr !== sourceDate) {
+      updateTargets(dateStr);
+    }
+  };
+
+  // --- Touch (Mobile) Logic ---
+  const handleTouchStart = (dateStr: string) => {
+    // On mobile, we might want to differentiate tap (open) vs drag (copy).
+    // For simplicity: Touching initiates the "potential" to drag. 
+    // If they move their finger, it becomes a drag.
+    // However, to keep it consistent with the PC "Click to open, Drag to copy" model:
+    startDrag(dateStr);
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    // If we are dragging, we MUST prevent scrolling to have a smooth selection experience
+    if (isDragging) {
+        // e.preventDefault(); // Note: This might need 'touch-action: none' in CSS
+    }
+    
+    // Get the element under the finger
+    const touch = e.touches[0];
+    const target = document.elementFromPoint(touch.clientX, touch.clientY);
+    
+    // Check if the target is (or is inside) a date cell
+    const cell = target?.closest('[data-date-cell="true"]');
+    if (cell) {
+        const dateStr = cell.getAttribute('data-date-str');
+        if (dateStr && dateStr !== sourceDate) {
+            updateTargets(dateStr);
+        }
+    }
+  };
+
+  const handleTouchEnd = () => {
+    finishDrag();
+  };
+
+  // --- Core Logic ---
+  const startDrag = (dateStr: string) => {
     setIsDragging(true);
     setSourceDate(dateStr);
     setSelectedTargets(new Set());
   };
 
-  const handleDateClick = (dateStr: string) => {
-    if (selectedTargets.size > 0) return;
-    onDateSelect(new Date(dateStr + "T00:00:00"));
-  };
-
-  const handleDateMouseEnter = (dateStr: string) => {
-    if (isDragging && sourceDate && dateStr !== sourceDate) {
-      const newTargets = new Set(selectedTargets);
-      newTargets.add(dateStr);
-      setSelectedTargets(newTargets);
-    }
+  const updateTargets = (dateStr: string) => {
+     const newTargets = new Set(selectedTargets);
+     newTargets.add(dateStr);
+     setSelectedTargets(newTargets);
   };
 
   const finishDrag = () => {
     if (isDragging && sourceDate && selectedTargets.size > 0) {
       onCopyEvents(sourceDate, Array.from(selectedTargets));
     }
+    // If no targets were selected, it effectively acts as a click/tap (handled by onClick usually, 
+    // but here we might need to handle it manually if onClick is blocked by touch logic)
     setIsDragging(false);
     setSourceDate(null);
     setSelectedTargets(new Set());
+  };
+
+  const handleDateClick = (dateStr: string) => {
+    // If we dragged and selected targets, don't open the day view
+    if (selectedTargets.size > 0) return;
+    onDateSelect(new Date(dateStr + "T00:00:00"));
   };
 
   const changeMonth = (delta: number) => {
@@ -136,8 +181,11 @@ export const MonthView: React.FC<MonthViewProps> = ({
             ))}
         </div>
 
-        {/* Days Grid - Apple Style: Rounded Cards, Gaps */}
-        <div className={`flex-1 grid grid-cols-7 grid-rows-${Math.max(5, totalRows)} gap-1.5`}>
+        {/* Days Grid */}
+        <div 
+            className={`flex-1 grid grid-cols-7 grid-rows-${Math.max(5, totalRows)} gap-1.5 touch-none`} // touch-none prevents scrolling while interacting with grid
+            onMouseLeave={finishDrag}
+        >
             {paddingDays.map((_, i) => (
             <div key={`pad-${i}`} />
             ))}
@@ -152,6 +200,9 @@ export const MonthView: React.FC<MonthViewProps> = ({
             return (
                 <div
                 key={dateStr}
+                // Data attributes for touch elementFromPoint detection
+                data-date-cell="true"
+                data-date-str={dateStr}
                 className={`
                     relative rounded-2xl flex flex-col items-center p-1 cursor-pointer transition-all duration-200 border shadow-sm overflow-hidden
                     ${isSource ? 'bg-blue-100 border-blue-400 ring-2 ring-blue-200 z-10 scale-105' : ''}
@@ -160,18 +211,21 @@ export const MonthView: React.FC<MonthViewProps> = ({
                 `}
                 onMouseDown={(e) => handleDateMouseDown(e, dateStr)}
                 onMouseEnter={() => handleDateMouseEnter(dateStr)}
+                onTouchStart={() => handleTouchStart(dateStr)}
+                onTouchMove={handleTouchMove}
+                onTouchEnd={handleTouchEnd}
                 onClick={() => handleDateClick(dateStr)}
                 >
                     {/* Date Number */}
                     <div className={`
-                        text-sm font-bold w-6 h-6 flex items-center justify-center rounded-full mb-1
+                        text-sm font-bold w-6 h-6 flex items-center justify-center rounded-full mb-1 pointer-events-none
                         ${isToday ? 'bg-red-500 text-white shadow-md' : 'text-gray-800'}
                     `}>
                         {day.getDate()}
                     </div>
                     
                     {/* Event Dots/Bars */}
-                    <div className="flex-1 w-full flex flex-col gap-0.5 px-0.5">
+                    <div className="flex-1 w-full flex flex-col gap-0.5 px-0.5 pointer-events-none">
                         {dayEvents.slice(0, 3).map((event, idx) => (
                             <div key={idx} className="h-1 rounded-full w-full" style={{ backgroundColor: event.colorHex }} />
                         ))}
